@@ -36,6 +36,45 @@ public class MyBot : IChessBot
         return moveToPlay;
     }
 
+    float ScorePosition(Board board)
+    {
+
+        if (board.IsDraw())
+        {
+            return 0;
+        }
+        if (board.IsInCheckmate())
+        {
+            return board.IsWhiteToMove ? -100000 : 100000;
+        }
+        PieceList[] pieceList = board.GetAllPieceLists();
+        float[] weights = { 1F, 0.01F };
+        int whiteScore = pieceValues[1] * pieceList[0].Count +
+                            pieceValues[2] * pieceList[1].Count +
+                            pieceValues[3] * pieceList[2].Count +
+                            pieceValues[4] * pieceList[3].Count +
+                            pieceValues[5] * pieceList[4].Count -
+                        (
+                            pieceValues[1] * pieceList[6].Count +
+                            pieceValues[2] * pieceList[7].Count +
+                            pieceValues[3] * pieceList[8].Count +
+                            pieceValues[4] * pieceList[9].Count +
+                            pieceValues[5] * pieceList[10].Count
+                        );
+
+        int activeMoveCount = board.IsWhiteToMove ? board.GetLegalMoves().Length : -board.GetLegalMoves().Length;
+        board.ForceSkipTurn();
+        int otherMoveCount = board.IsWhiteToMove ? board.GetLegalMoves().Length : -board.GetLegalMoves().Length;
+        board.UndoSkipTurn();
+        int moveAdvantage = activeMoveCount + otherMoveCount;
+
+        // System.Console.Write("Number of moves: ");
+        // System.Console.WriteLine(moveAdvantage);
+
+
+        return weights[0] * whiteScore + weights[1] * moveAdvantage;
+    }
+
     /// <summary>
     /// Evaluate the current position and return a score.
     /// A positive score indicates an evaluation favoring white,
@@ -46,20 +85,7 @@ public class MyBot : IChessBot
         // If depth is zero, simply add the scores of all pieces (omitting kings)
         if (depth == 0)
         {
-            PieceList[] pieceList = board.GetAllPieceLists();
-            int whiteScore = pieceValues[1] * pieceList[0].Count +
-                                pieceValues[2] * pieceList[1].Count +
-                                pieceValues[3] * pieceList[2].Count +
-                                pieceValues[4] * pieceList[3].Count +
-                                pieceValues[5] * pieceList[4].Count -
-                            (
-                                pieceValues[1] * pieceList[6].Count +
-                                pieceValues[2] * pieceList[7].Count +
-                                pieceValues[3] * pieceList[8].Count +
-                                pieceValues[4] * pieceList[9].Count +
-                                pieceValues[5] * pieceList[10].Count
-                            );
-            return whiteScore;
+            return this.ScorePosition(board);
 
         }
 
@@ -81,7 +107,6 @@ public class MyBot : IChessBot
 
             if (score * multiplier > bestScore * multiplier)
             {
-
                 bestScore = score;
             }
 
