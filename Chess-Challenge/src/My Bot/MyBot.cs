@@ -6,6 +6,10 @@ public class MyBot : IChessBot
     // Piece values: null, pawn, knight, bishop, rook, queen, king
     int[] pieceValues = { 0, 1, 3, 3, 5, 9, 10000 };
 
+    Move bestMove = new Move();
+    int moveCount = 0;
+    int maxMoveCount = 200;
+
     public Move Think(Board board, Timer timer)
     {
 
@@ -13,27 +17,126 @@ public class MyBot : IChessBot
         int multiplier = board.IsWhiteToMove ? 1 : -1;
 
         Move[] moves = board.GetLegalMoves();
-        float maxEvaluation = float.NegativeInfinity;
         System.Random rng = new();
-        Move moveToPlay = moves[rng.Next(moves.Length)];
-        foreach (Move move in moves)
-        {
-            board.MakeMove(move);
-            float moveEvaluation = this.Evaluate(board, 2) * multiplier;
-            // System.Console.WriteLine(move);
-            // System.Console.WriteLine(multiplier);
-            // System.Console.WriteLine(moveEvaluation);
-            // System.Console.WriteLine('\n');
-            if (moveEvaluation > maxEvaluation)
-            {
+        float score = float.NegativeInfinity;
+        this.bestMove = moves[0];
 
-                moveToPlay = move;
-                maxEvaluation = moveEvaluation;
-            }
-            board.UndoMove(move);
+        if (board.IsWhiteToMove)
+        {
+            score = this.WhiteSearch(board: board, depth: 4, setMove: true);
+        }
+        else
+        {
+            score = this.BlackSearch(board: board, depth: 4, setMove: true);
         }
         // System.Console.WriteLine("____________\n\n\n");
-        return moveToPlay;
+        return this.bestMove;
+    }
+
+    float BlackSearch(
+        Board board,
+        int depth = 0,
+        float alpha = float.NegativeInfinity,
+        float beta = float.PositiveInfinity,
+        bool setMove = false)
+    {
+        if (depth == 0)
+        {
+            if (setMove)
+            {
+                this.bestMove = new Move();
+            }
+            return this.ScorePosition(board);
+        }
+
+        float score = float.PositiveInfinity;
+        Move moveToSet = new Move();
+        foreach (Move move in board.GetLegalMoves())
+        {
+            board.MakeMove(move);
+            float newScore = WhiteSearch(board: board, depth: depth - 1, alpha: alpha, beta: beta);
+            board.UndoMove(move);
+
+            if (newScore <= alpha)
+            {
+                // System.Console.Write("Pruning with newScore: ");
+                // System.Console.Write(newScore);
+                // System.Console.Write(" and alpha: ");
+                // System.Console.Write(alpha);
+                // System.Console.Write(" and depth: ");
+                // System.Console.WriteLine(depth);
+                if (setMove)
+                {
+                    this.bestMove = move;
+                }
+                return newScore;
+            }
+            if (newScore <= beta)
+            {
+                beta = newScore;
+            }
+            if (newScore < score)
+            {
+                moveToSet = move;
+                score = newScore;
+            }
+        }
+        if (setMove)
+        {
+            this.bestMove = moveToSet;
+        }
+        return score;
+    }
+
+    float WhiteSearch(
+        Board board,
+        int depth = 0,
+        float alpha = float.NegativeInfinity,
+        float beta = float.PositiveInfinity,
+        bool setMove = false)
+    {
+        if (depth == 0)
+        {
+            if (setMove)
+            {
+                this.bestMove = new Move();
+            }
+            return this.ScorePosition(board);
+        }
+
+        float score = float.NegativeInfinity;
+        Move moveToSet = new Move();
+
+        foreach (Move move in board.GetLegalMoves())
+        {
+            board.MakeMove(move);
+            float newScore = BlackSearch(board: board, depth: depth - 1, alpha: alpha, beta: beta);
+            board.UndoMove(move);
+
+            if (newScore >= beta)
+            {
+                if (setMove)
+                {
+                    this.bestMove = move;
+                }
+                return newScore;
+            }
+            if (newScore >= alpha)
+            {
+                alpha = newScore;
+            }
+            if (newScore > score)
+            {
+                moveToSet = move;
+                score = newScore;
+            }
+
+        }
+        if (setMove)
+        {
+            this.bestMove = moveToSet;
+        }
+        return score;
     }
 
     float ScorePosition(Board board)
@@ -45,7 +148,7 @@ public class MyBot : IChessBot
         }
         if (board.IsInCheckmate())
         {
-            return board.IsWhiteToMove ? -100000 : 100000;
+            return board.IsWhiteToMove ? float.NegativeInfinity : float.PositiveInfinity;
         }
         PieceList[] pieceList = board.GetAllPieceLists();
         float[] weights = { 1F, 0.01F };
@@ -75,45 +178,4 @@ public class MyBot : IChessBot
         return weights[0] * whiteScore + weights[1] * moveAdvantage;
     }
 
-    /// <summary>
-    /// Evaluate the current position and return a score.
-    /// A positive score indicates an evaluation favoring white,
-    /// a negative score indicates an evaluation favoring black.
-    /// </summary>
-    float Evaluate(Board board, uint depth = 0)
-    {
-        // If depth is zero, simply add the scores of all pieces (omitting kings)
-        if (depth == 0)
-        {
-            return this.ScorePosition(board);
-
-        }
-
-
-        // If blacks turn, treat more negative scores as higher
-        int multiplier = board.IsWhiteToMove ? 1 : -1;
-
-        float bestScore = board.IsWhiteToMove ? float.NegativeInfinity : float.PositiveInfinity;
-        // Iterate through all possible moves
-        foreach (Move move in board.GetLegalMoves())
-        {
-
-
-            // Evaluate the position after each move
-            board.MakeMove(move);
-            float score = Evaluate(board, depth - 1);
-            board.UndoMove(move);
-
-
-            if (score * multiplier > bestScore * multiplier)
-            {
-                bestScore = score;
-            }
-
-        }
-        // System.Console.WriteLine(bestScore);
-        // System.Console.WriteLine(board.IsWhiteToMove);
-        // System.Console.WriteLine("\n\n\n");
-        return bestScore;
-    }
 }
